@@ -1,0 +1,684 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Measure · 악보 연습실</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #f5f4ef;
+        color: #24362f;
+        font:
+          15px system-ui,
+          sans-serif;
+      }
+      button,
+      input {
+        font: inherit;
+      }
+      button {
+        cursor: pointer;
+        border: 1px solid #dbdfd6;
+        background: white;
+        border-radius: 10px;
+        padding: 10px 16px;
+        color: inherit;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      button:hover {
+        background: #edf2e8;
+      }
+      button:focus-visible,
+      input:focus-visible {
+        outline: 3px solid #e5ac48;
+      }
+      .app {
+        display: grid;
+        grid-template-columns: 250px 1fr;
+        min-height: 100vh;
+      }
+      aside {
+        background: #edf0e7;
+        padding: 32px 22px;
+        border-right: 1px solid #dce1d5;
+      }
+      .logo {
+        font: 700 28px Georgia;
+      }
+      .tag {
+        font-size: 12px;
+        color: #7b8779;
+        margin-top: 6px;
+      }
+      .primary {
+        background: #284f3e;
+        color: white;
+        border: 0;
+      }
+      .primary:hover {
+        background: #38684f;
+      }
+      .upload {
+        width: 100%;
+        margin: 34px 0 28px;
+      }
+      h2 {
+        font-size: 11px;
+        letter-spacing: 2px;
+        color: #7b8779;
+        text-transform: uppercase;
+      }
+      .library {
+        margin: 10px 0;
+        padding: 16px;
+        border-radius: 12px;
+        cursor: pointer;
+      }
+      .library.active {
+        background: white;
+        box-shadow: 0 3px 12px #253e2d08;
+      }
+      .library small {
+        display: block;
+        color: #8a9387;
+        margin-top: 7px;
+      }
+      .sidebar-foot {
+        font-size: 12px;
+        color: #7b8779;
+        margin-top: 70px;
+        line-height: 1.8;
+      }
+      main {
+        padding: 30px 5vw 110px;
+        max-width: 1450px;
+        width: 100%;
+        margin: auto;
+      }
+      .top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        color: #83907f;
+        font-size: 12px;
+      }
+      .pill {
+        background: #ebe5d8;
+        padding: 7px 12px;
+        border-radius: 20px;
+        color: #756947;
+      }
+      .heading {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin: 35px 0 24px;
+      }
+      h1 {
+        font:
+          40px Georgia,
+          serif;
+        margin: 0 0 8px;
+      }
+      .muted {
+        color: #8b9488;
+        font-size: 13px;
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+      }
+      .workspace {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 240px;
+        gap: 24px;
+      }
+      .paper {
+        background: white;
+        border: 1px solid #e1e4db;
+        border-radius: 16px;
+        padding: 28px 30px;
+        box-shadow: 0 10px 30px #293a2b06;
+      }
+      .paper-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #edf0e9;
+        padding-bottom: 20px;
+      }
+      .tabs button {
+        border: 0;
+        background: transparent;
+        color: #929b8e;
+        padding: 8px;
+      }
+      .tabs button.active {
+        color: #28533c;
+        border-bottom: 2px solid #28533c;
+        border-radius: 0;
+      }
+      .score-title {
+        text-align: center;
+        font: 26px Georgia;
+        margin: 35px 0 8px;
+      }
+      .score-sub {
+        text-align: center;
+        color: #9ca395;
+        font: 12px Georgia;
+      }
+      .line {
+        position: relative;
+        padding: 12px 0;
+        border-radius: 10px;
+        margin-top: 20px;
+        cursor: pointer;
+      }
+      .line.selected {
+        background: #eff5e8;
+      }
+      .note {
+        cursor: pointer;
+      }
+      .note:hover ellipse {
+        fill: #a87a2d;
+      }
+      .note.current ellipse {
+        fill: #de8d27;
+      }
+      .note.current line {
+        stroke: #de8d27;
+      }
+      .line-label {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .line-label {
+        font-size: 10px;
+        color: #86927b;
+        margin: 0 0 5px 10px;
+      }
+      .line svg {
+        width: 100%;
+        height: auto;
+        display: block;
+      }
+      .settings {
+        background: #eeeee6;
+        border-radius: 16px;
+        padding: 22px;
+        height: fit-content;
+      }
+      .settings h3 {
+        font-size: 15px;
+        margin: 0 0 20px;
+      }
+      .setting {
+        padding: 18px 0;
+        border-bottom: 1px solid #dce0d3;
+      }
+      .setting:first-of-type {
+        padding-top: 0;
+      }
+      input[type="range"] {
+        width: 100%;
+        accent-color: #365c43;
+      }
+      .bpm {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        margin: 14px 0;
+      }
+      .bpm input {
+        width: 85px;
+        border: 0;
+        background: transparent;
+        font-size: 40px;
+        color: #284e3b;
+        font-weight: 600;
+      }
+      .chips {
+        display: flex;
+        gap: 5px;
+        flex-wrap: wrap;
+        margin-top: 13px;
+      }
+      .chips button {
+        padding: 7px 10px;
+        font-size: 12px;
+      }
+      .chips .active {
+        background: #365b43;
+        color: white;
+      }
+      .hint {
+        font-size: 12px;
+        line-height: 1.8;
+        color: #89917f;
+        margin-top: 20px;
+      }
+      .player {
+        position: fixed;
+        bottom: 0;
+        left: 250px;
+        right: 0;
+        background: #fffefbf5;
+        border-top: 1px solid #dfe3d7;
+        padding: 17px 5vw;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+      }
+      .play {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        padding: 0;
+      }
+      .progress {
+        flex: 1;
+      }
+      .track {
+        height: 4px;
+        background: #e7ebdf;
+        margin: 8px 0;
+        border-radius: 5px;
+      }
+      .track span {
+        display: block;
+        width: 28%;
+        height: 100%;
+        background: #618357;
+      }
+      .beat {
+        display: flex;
+        gap: 8px;
+      }
+      .beat i {
+        width: 10px;
+        height: 10px;
+        background: #dfe5d6;
+        border-radius: 50%;
+      }
+      .beat i:first-child {
+        background: #416547;
+      }
+      .toast {
+        position: fixed;
+        top: 22px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #284f3e;
+        color: white;
+        padding: 14px 24px;
+        border-radius: 12px;
+        display: none;
+        z-index: 4;
+      }
+      dialog {
+        border: 0;
+        border-radius: 20px;
+        max-width: 520px;
+        width: 90%;
+        padding: 32px;
+        color: #24362f;
+      }
+      dialog::backdrop {
+        background: #233b2c60;
+      }
+      .drop {
+        border: 2px dashed #d5ddca;
+        border-radius: 14px;
+        padding: 38px 16px;
+        text-align: center;
+        background: #f7f8f2;
+        margin: 25px 0;
+      }
+      .drop input {
+        max-width: 100%;
+        margin-top: 20px;
+      }
+      pre {
+        white-space: pre-wrap;
+        line-height: 1.9;
+        font-size: 13px;
+      }
+      .hidden {
+        display: none !important;
+      }
+      @media (max-width: 1000px) {
+        .workspace {
+          grid-template-columns: 1fr;
+        }
+        .settings {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 15px;
+        }
+        .settings h3,
+        .hint {
+          grid-column: 1/-1;
+        }
+        .app {
+          grid-template-columns: 200px 1fr;
+        }
+        .player {
+          left: 200px;
+        }
+        .heading {
+          align-items: flex-start;
+          gap: 15px;
+        }
+        h1 {
+          font-size: 32px;
+        }
+      }
+      @media (max-width: 680px) {
+        .app {
+          display: block;
+        }
+        aside {
+          padding: 18px;
+        }
+        .library,
+        .sidebar-foot,
+        aside h2 {
+          display: none;
+        }
+        .upload {
+          margin: 16px 0 0;
+        }
+        main {
+          padding: 24px 16px 130px;
+        }
+        .heading {
+          flex-direction: column;
+          margin: 25px 0;
+        }
+        .paper {
+          padding: 18px 12px;
+        }
+        .player {
+          left: 0;
+          padding: 14px;
+          gap: 12px;
+        }
+        .player .muted:last-child {
+          display: none;
+        }
+        .settings {
+          grid-template-columns: 1fr;
+        }
+        .top {
+          gap: 10px;
+        }
+      }
+      .abcjs-note {
+        cursor: pointer;
+        pointer-events: bounding-box;
+      }
+      .abcjs-note:hover {
+        fill: #b47a2c;
+      }
+      .playing-note {
+        fill: #e08a25 !important;
+      }
+      .score-original {
+        width: 100%;
+        max-height: 650px;
+        object-fit: contain;
+      }
+      #notation {
+        overflow-x: auto;
+      }
+      textarea {
+        outline-offset: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside>
+        <div class="logo">♫ measure</div>
+        <div class="tag">나만의 악보 연습실</div>
+        <button class="primary upload" id="upload">＋ 스캔 악보 가져오기</button
+        ><button
+          id="library-open"
+          style="
+            width: 100%;
+            text-align: left;
+            background: transparent;
+            border: 0;
+            padding: 0;
+            margin-bottom: 12px;
+            font-weight: 600;
+          "
+        >
+          내 악보 →
+        </button>
+        <h2>최근 등록 · 최대 5개</h2>
+        <div id="recent-scores"></div>
+        <button id="new-abc" style="width: 100%; margin-top: 12px">
+          ＋ ABC 직접 입력
+        </button>
+        <div class="sidebar-foot">
+          한 줄씩, 나의 속도로.<br />오늘도 음악에 조금 더 가까이.
+        </div>
+      </aside>
+      <main>
+        <section id="library-view" class="hidden">
+          <div class="top">
+            <span>내 악보 / 전체 목록</span
+            ><span class="pill">최근 등록순</span>
+          </div>
+          <div class="heading">
+            <div>
+              <h1>내 악보</h1>
+              <div class="muted">등록한 모든 악보를 확인하세요.</div>
+            </div>
+            <button id="library-upload" class="primary">
+              ＋ 악보 가져오기
+            </button>
+          </div>
+          <input
+            id="search"
+            type="search"
+            placeholder="악보 제목 검색"
+            aria-label="악보 제목 검색"
+            style="
+              width: 100%;
+              padding: 14px;
+              border: 1px solid #dce1d5;
+              border-radius: 10px;
+              margin-bottom: 20px;
+            "
+          />
+          <section class="paper">
+            <div class="muted" id="list-count"></div>
+            <div id="all-scores"></div>
+          </section>
+        </section>
+        <section id="detail-view">
+          <div class="top">
+            <span id="breadcrumb">내 악보 / 작은 별</span
+            ><span class="pill">악보 연습실</span>
+          </div>
+          <div class="heading">
+            <div>
+              <input
+                id="title"
+                value="작은 별"
+                aria-label="악보 제목"
+                maxlength="200"
+                style="
+                  font: 36px Georgia;
+                  background: transparent;
+                  border: 0;
+                  width: 100%;
+                  color: #24362f;
+                  padding: 0;
+                  margin-bottom: 8px;
+                "
+              />
+              <div class="muted" id="save-status">새 악보 · 저장 전</div>
+            </div>
+            <div class="actions">
+              <button id="save" title="수정한 악보를 저장합니다" disabled>
+                변경사항 저장</button
+              ><button id="delete">삭제</button>
+            </div>
+          </div>
+          <div class="workspace">
+            <section class="paper">
+              <div class="paper-head">
+                <div class="tabs">
+                  <button class="active" data-tab="score">악보</button
+                  ><button data-tab="abc">ABC 코드</button
+                  ><button data-tab="scan">원본 스캔</button>
+                </div>
+                <span class="muted" id="meter-label">ABC 악보</span>
+              </div>
+              <div id="score">
+                <div id="notation"></div>
+                <p class="muted" id="abc-errors" role="status"></p>
+              </div>
+              <textarea
+                id="abc"
+                class="hidden"
+                aria-label="ABC 코드 편집"
+                spellcheck="false"
+                style="
+                  display: block;
+                  width: 100%;
+                  min-height: 360px;
+                  resize: vertical;
+                  margin-top: 24px;
+                  padding: 18px;
+                  border: 1px solid #dce1d5;
+                  border-radius: 10px;
+                  background: #fafbf7;
+                  color: #24362f;
+                  font: 14px/1.9 monospace;
+                "
+              >
+X:1
+T:Twinkle, Twinkle, Little Star
+M:4/4
+L:1/4
+Q:1/4=100
+K:C
+C C G G | A A G2 | F F E E | D D C2 |
+G G F F | E E D2 | G G F F | E E D2 |
+C C G G | A A G2 | F F E E | D D C2 |]</textarea>
+              <div id="scan" class="hidden drop">
+                아직 원본 스캔이 없습니다.
+                <p class="muted">
+                  악보를 가져오면 이곳에서 원본과 비교할 수 있어요.
+                </p>
+                <button onclick="document.querySelector('dialog').showModal()">
+                  스캔 악보 가져오기
+                </button>
+              </div>
+            </section>
+            <section class="settings">
+              <h3>연습 설정</h3>
+              <div class="setting">
+                <span class="muted">템포</span>
+                <div class="bpm">
+                  <input
+                    id="bpm"
+                    type="number"
+                    min="30"
+                    max="240"
+                    value="100"
+                    aria-label="BPM"
+                  /><span class="muted">BPM</span>
+                </div>
+                <input
+                  id="range"
+                  type="range"
+                  min="30"
+                  max="240"
+                  value="100"
+                  aria-label="템포 조절"
+                />
+                <div class="muted">느리게 ← → 빠르게</div>
+              </div>
+              <div class="setting">
+                <span>음표에서 바로 연습</span>
+                <p class="hint">
+                  음표를 클릭하면 그 음부터 재생을 시작합니다. 재생 중인 음표는
+                  주황색으로 표시됩니다.
+                </p>
+              </div>
+              <div class="setting">
+                <label
+                  ><input id="highlight" type="checkbox" checked /> 음표 색상
+                  표시</label
+                ><br /><br /><label
+                  ><input id="metronome" type="checkbox" /> 메트로놈 소리</label
+                >
+              </div>
+              <div class="hint">
+                시작하고 싶은 음표를 클릭하세요. 재생 중인 음표에 주황색이
+                표시됩니다.
+              </div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+    <footer class="player">
+      <button class="primary play" id="play" aria-label="재생 또는 일시정지">
+        ▶</button
+      ><button id="reset" aria-label="처음으로">↺</button>
+      <div class="progress">
+        <span
+          ><span id="player-title">작은 별</span>
+          <span class="muted">· 피아노 재생</span></span
+        >
+        <div class="track">
+          <span id="progress-bar" style="width: 0%"></span>
+        </div>
+        <div class="muted">음표를 클릭해 원하는 위치부터 연습하세요.</div>
+      </div>
+      <span class="muted" id="player-bpm">100 BPM</span>
+    </footer>
+    <dialog>
+      <h1 style="font-size: 28px">스캔 악보 가져오기</h1>
+      <p class="muted">종이 악보를 나만의 연습 악보로.</p>
+      <div class="drop">
+        ↑
+        <p>스캔 이미지 또는 PDF를 선택하세요</p>
+        <div class="muted">PNG, JPG, PDF · 최대 20MB</div>
+        <input
+          type="file"
+          accept="image/png,image/jpeg,application/pdf"
+          aria-label="스캔 악보 선택"
+        />
+      </div>
+      <p class="hint">
+        Audiveris로 악보 인식 → 결과 저장 → ABC 확인·수정<br />인쇄 악보를
+        권장합니다. 손글씨·저해상도 악보는 정확도가 낮습니다.
+      </p>
+      <p id="import-status" role="status" class="hint"></p>
+      <div class="actions">
+        <button onclick="document.querySelector('dialog').close()">닫기</button
+        ><button class="primary" id="convert">악보 변환하기</button>
+      </div>
+    </dialog>
+    <div class="toast" role="status"></div>
+    <script src="/vendor/abcjs-basic-min.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>

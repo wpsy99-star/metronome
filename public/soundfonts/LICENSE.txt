@@ -1,0 +1,6 @@
+FluidR3_GM acoustic grand piano samples.
+Fluid soundfont by Frank Wen; MIDI.js MP3 conversion by midi-js-soundfonts contributors.
+Source: https://github.com/paulrosen/midi-js-soundfonts/tree/gh-pages/FluidR3_GM
+License: Creative Commons Attribution 3.0 United States
+https://creativecommons.org/licenses/by/3.0/us/
+Piano MP3 samples are redistributed unchanged.

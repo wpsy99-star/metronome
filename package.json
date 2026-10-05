@@ -1,0 +1,33 @@
+{
+  "name": "measure",
+  "version": "1.0.0",
+  "description": "스캔 악보를 가져와 템포를 조절하고 음표를 클릭한 위치부터 연습하는 앱의 UI 시안입니다.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wpsy99-star/metronome.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/wpsy99-star/metronome/issues"
+  },
+  "homepage": "https://github.com/wpsy99-star/metronome#readme",
+  "dependencies": {
+    "abcjs": "^6.7.1",
+    "express": "^5.2.1",
+    "multer": "^2.4.0"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0"
+  }
+}
