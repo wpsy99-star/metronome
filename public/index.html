@@ -450,8 +450,8 @@
     <div class="app">
       <aside>
         <div class="logo">♫ measure</div>
-        <div class="tag">나만의 악보 연습실</div>
-        <button class="primary upload" id="upload">＋ 스캔 악보 가져오기</button
+        <div class="tag">나만의 악보 연습실 · 브라우저 저장</div>
+        <button class="primary upload" id="upload">＋ ABC 파일 가져오기</button
         ><button
           id="library-open"
           style="
@@ -535,6 +535,7 @@
             <div class="actions">
               <button id="save" title="수정한 악보를 저장합니다" disabled>
                 변경사항 저장</button
+              ><button id="export">ABC 내보내기</button
               ><button id="delete">삭제</button>
             </div>
           </div>
@@ -543,8 +544,7 @@
               <div class="paper-head">
                 <div class="tabs">
                   <button class="active" data-tab="score">악보</button
-                  ><button data-tab="abc">ABC 코드</button
-                  ><button data-tab="scan">원본 스캔</button>
+                  ><button data-tab="abc">ABC 코드</button>
                 </div>
                 <span class="muted" id="meter-label">ABC 악보</span>
               </div>
@@ -580,15 +580,6 @@ K:C
 C C G G | A A G2 | F F E E | D D C2 |
 G G F F | E E D2 | G G F F | E E D2 |
 C C G G | A A G2 | F F E E | D D C2 |]</textarea>
-              <div id="scan" class="hidden drop">
-                아직 원본 스캔이 없습니다.
-                <p class="muted">
-                  악보를 가져오면 이곳에서 원본과 비교할 수 있어요.
-                </p>
-                <button onclick="document.querySelector('dialog').showModal()">
-                  스캔 악보 가져오기
-                </button>
-              </div>
             </section>
             <section class="settings">
               <h3>연습 설정</h3>
@@ -655,26 +646,26 @@ C C G G | A A G2 | F F E E | D D C2 |]</textarea>
       <span class="muted" id="player-bpm">100 BPM</span>
     </footer>
     <dialog>
-      <h1 style="font-size: 28px">스캔 악보 가져오기</h1>
-      <p class="muted">종이 악보를 나만의 연습 악보로.</p>
+      <h1 style="font-size: 28px">ABC 파일 가져오기</h1>
+      <p class="muted">ABC 코드를 나만의 연습 악보로.</p>
       <div class="drop">
         ↑
-        <p>스캔 이미지 또는 PDF를 선택하세요</p>
-        <div class="muted">PNG, JPG, PDF · 최대 20MB</div>
+        <p>ABC 파일을 선택하세요</p>
+        <div class="muted">UTF-8 .abc 파일 · 최대 500KB</div>
         <input
           type="file"
-          accept="image/png,image/jpeg,application/pdf"
-          aria-label="스캔 악보 선택"
+          accept=".abc,text/plain"
+          aria-label="ABC 파일 선택"
         />
       </div>
       <p class="hint">
-        Audiveris로 악보 인식 → 결과 저장 → ABC 확인·수정<br />인쇄 악보를
-        권장합니다. 손글씨·저해상도 악보는 정확도가 낮습니다.
+        악보는 현재 브라우저에 저장됩니다. 다른 기기와 자동 동기화되지 않습니다.
+        필요한 악보는 ABC 파일로 내보내 보관하세요.
       </p>
       <p id="import-status" role="status" class="hint"></p>
       <div class="actions">
         <button onclick="document.querySelector('dialog').close()">닫기</button
-        ><button class="primary" id="convert">악보 변환하기</button>
+        ><button class="primary" id="convert">파일 가져오기</button>
       </div>
     </dialog>
     <div class="toast" role="status"></div>

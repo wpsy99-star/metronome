@@ -3,3 +3,5 @@ data/
 tools/audiveris/
 *.log
 __pycache__/
+dist/
+.vercel/

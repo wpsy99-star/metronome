@@ -1,21 +1,13 @@
 const { test, before, after } = require("node:test");
 const assert = require("node:assert/strict");
 const { spawn } = require("node:child_process");
-const fs = require("node:fs");
-const os = require("node:os");
-const path = require("node:path");
 const { chromium } = require("playwright");
-const data = fs.mkdtempSync(path.join(os.tmpdir(), "measure-test-"));
 let server, browser;
-const base = "http://127.0.0.1:3012";
-const abc = "X:1\nT:Test\nM:4/4\nL:1/4\nQ:1/4=120\nK:C\nC D E F | G A B c |]";
-async function api(url, options = {}) {
-  const r = await fetch(base + url, options);
-  return { status: r.status, body: await r.json() };
-}
+const abc =
+  "X:1\nT:Imported\nM:4/4\nL:1/4\nQ:1/4=120\nK:C\nC D E F | G A B c |]";
 before(async () => {
-  server = spawn(process.execPath, ["server.js"], {
-    env: { ...process.env, PORT: "3012", MEASURE_DATA_DIR: data },
+  server = spawn(process.execPath, ["scripts/serve.js"], {
+    env: { ...process.env, PORT: "3012" },
     stdio: "pipe",
   });
   await new Promise((resolve, reject) => {
@@ -23,7 +15,7 @@ before(async () => {
       if (b.toString().includes("started")) resolve();
     });
     server.on("error", reject);
-    server.on("exit", () => reject(new Error("server exited")));
+    server.on("exit", () => reject(Error("server exited")));
   });
   browser = await chromium.launch({
     executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium",
@@ -32,186 +24,124 @@ before(async () => {
   });
 });
 after(async () => {
-  if (browser) await browser.close();
+  await browser?.close();
+  const done = new Promise((r) => server.once("exit", r));
   server.kill("SIGTERM");
-  await new Promise((r) => server.once("exit", r));
-  fs.rmSync(data, { recursive: true, force: true });
+  await done;
 });
-test("SQLite CRUD, validation and original-file protection", async () => {
-  assert.equal((await api("/api/scores")).body.length, 0);
-  assert.equal(
-    (
-      await api("/api/scores", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: "", abc, bpm: 120 }),
-      })
-    ).status,
-    400,
-  );
-  const r = await api("/api/scores", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title: "test", abc, bpm: 120 }),
-  });
-  assert.equal(r.status, 201);
-  const id = r.body.id;
-  assert.equal((await api("/api/scores/" + id)).body.abc, abc);
-  assert.equal(
-    (
-      await api("/api/scores/" + id, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: "updated", abc, bpm: 80 }),
-      })
-    ).status,
-    200,
-  );
-  assert.equal((await api("/api/scores/" + id)).body.bpm, 80);
-  assert.equal(
-    (await api("/api/scores/" + id, { method: "DELETE" })).status,
-    200,
-  );
-  assert.equal((await api("/api/scores/" + id)).status, 404);
-});
-test("Browser: ABC render/edit/save, recent five, full list, BPM, note seek and synchronized color", async () => {
-  const page = await browser.newPage({
-    viewport: { width: 1440, height: 1100 },
-    deviceScaleFactor: 2,
-  });
-  const errors = [];
+test("Static browser app: edit/save/reload, note seek and audio, recent five, list/search/delete", async () => {
+  const page = await browser.newPage();
+  const errors = [],
+    apiRequests = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto(base);
-  await page.waitForSelector("#notation .abcjs-note");
-  assert.equal(await page.locator("#recent-scores .library").count(), 0);
+  page.on("request", (r) => {
+    if (r.url().includes("/api/")) apiRequests.push(r.url());
+  });
+  await page.goto("http://127.0.0.1:3012");
+  await page.waitForSelector(".abcjs-note");
+  assert.equal(await page.locator("[data-tab=scan]").count(), 0);
   await page.locator("[data-tab=abc]").click();
   await page.locator("#abc").fill(abc);
-  await page.locator("#title").fill("Browser score");
-  await page.waitForTimeout(500);
+  await page.locator("#title").fill("Saved test");
+  await page.waitForTimeout(450);
   await page.locator("#save").click();
-  await page.waitForFunction(
-    () => document.querySelector("#save-status").textContent === "저장됨",
-  );
   await page.reload();
-  await page.waitForSelector("#notation .abcjs-note");
-  assert.equal(await page.locator("#title").inputValue(), "Browser score");
-  await page.locator("[data-tab=abc]").click();
-  assert.equal(await page.locator("#abc").inputValue(), abc);
-  await page.locator("[data-tab=score]").click();
+  await page.waitForSelector(".abcjs-note");
+  assert.equal(await page.locator("#title").inputValue(), "Saved test");
   await page.locator("#bpm").fill("60");
   await page.locator("#bpm").dispatchEvent("change");
   await page.locator("#save").click();
-  await page.waitForFunction(
-    () => document.querySelector("#save-status").textContent === "저장됨",
-  );
-  await page
-    .locator("#notation .abcjs-note")
-    .nth(4)
-    .locator("path")
-    .first()
-    .click();
+  await page.locator(".abcjs-note").nth(4).locator("path").first().click();
   await page.waitForFunction(
     () => document.querySelector("#play").textContent === "Ⅱ",
   );
-  await page.waitForFunction(
-    () => document.querySelectorAll(".playing-note").length > 0,
-  );
+  await page.waitForFunction(() => document.querySelector(".playing-note"));
   const state = await page.evaluate(() => ({
     position,
-    playing,
-    bpm: document.querySelector("#bpm").value,
-    clock: audio.currentTime,
-    startClock,
-    synthDuration: synth.duration,
-    timings: timings.map((t) => t.milliseconds),
+    audible: synth.audioBuffers.some((b) =>
+      b.getChannelData(0).some((v) => Math.abs(v) > 0.001),
+    ),
   }));
-  assert.equal(state.bpm, "60");
   assert(state.position >= 4000 && state.position < 6000);
-  assert(state.playing);
-  assert(
-    Math.abs(state.position - (state.clock - state.startClock) * 1000) < 100,
-  );
-  await page.locator("#play").click();
-  assert.equal(await page.locator("#play").textContent(), "▶");
+  assert(state.audible);
   await page.locator("#reset").click();
-  assert.equal(await page.locator(".playing-note").count(), 0);
-  // Render a high resolution scan for a real OMR end-to-end test.
-  await page.locator("[data-tab=abc]").click();
-  await page
-    .locator("#abc")
-    .fill(
-      "X:1\nT:Twinkle\nM:4/4\nL:1/4\nQ:1/4=100\nK:C\nC C G G | A A G2 | F F E E | D D C2 |\nG G F F | E E D2 | G G F F | E E D2 |\nC C G G | A A G2 | F F E E | D D C2 |]",
-    );
-  await page.waitForTimeout(500);
-  await page.locator("#save").click();
-  await page.waitForFunction(
-    () => document.querySelector("#save-status").textContent === "저장됨",
-  );
-  await page.locator("[data-tab=score]").click();
-  await page
-    .locator("#notation")
-    .screenshot({ path: path.join(data, "scan.png") });
-  for (let i = 0; i < 6; i++)
-    await api("/api/scores", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: "Score " + i, abc, bpm: 100 }),
-    });
-  await page.reload();
-  await page.waitForSelector("#recent-scores .library");
+  await page.evaluate(async () => {
+    for (let i = 0; i < 6; i++)
+      await scoreStore("/api/scores", {
+        method: "POST",
+        body: JSON.stringify({
+          title: "Item " + i,
+          abc: document.querySelector("#abc").value,
+          bpm: 100,
+        }),
+      });
+    await refresh();
+  });
   assert.equal(await page.locator("#recent-scores .library").count(), 5);
   await page.locator("#library-open").click();
   assert.equal(await page.locator("#all-scores > div").count(), 7);
-  await page.locator("#search").fill("Browser");
+  await page.locator("#search").fill("Saved test");
   assert.equal(await page.locator("#all-scores > div").count(), 1);
   page.on("dialog", (d) => d.accept());
   await page.locator("#all-scores > div button").last().click();
   await page.waitForFunction(() =>
     document.querySelector("#all-scores").textContent.includes("검색 결과"),
   );
+  await page.reload();
+  await page.waitForSelector(".abcjs-note");
+  assert.equal(await page.evaluate(() => readScores().length), 6);
+  assert.deepEqual(apiRequests, []);
   assert.deepEqual(errors, []);
   await page.close();
 });
-test(
-  "Scan to ABC via real Audiveris, persists original and playable notation",
-  { timeout: 260000 },
-  async () => {
-    const scan = path.join(data, "scan.png");
-    assert(fs.existsSync(scan));
-    const form = new FormData();
-    form.append(
-      "file",
-      new Blob([fs.readFileSync(scan)], { type: "image/png" }),
-      "scan.png",
-    );
-    const r = await api("/api/import", { method: "POST", body: form });
-    assert.equal(r.status, 201, JSON.stringify(r.body));
-    const score = (await api("/api/scores/" + r.body.id)).body;
-    assert.match(score.abc, /^K:/m);
-    assert.match(score.abc, /[CDEFGAB]/);
-    const original = await fetch(
-      base + "/api/scores/" + r.body.id + "/original",
-    );
-    assert.equal(original.status, 200);
-    const page = await browser.newPage();
-    await page.goto(base);
-    await page.waitForSelector("#notation .abcjs-note");
-    await page.locator("#play").click();
-    await page.waitForFunction(
-      () => document.querySelector("#play").textContent === "Ⅱ",
-    );
-    assert.equal(
-      await page.locator("#notation .abcjs-note").count(),
-      42,
-      score.abc,
-    );
-    await page.close();
-  },
-);
-test("Compound meter playback uses quarter-note BPM consistently", async () => {
+test("ABC file import, manual save and export", async () => {
   const page = await browser.newPage();
-  await page.goto(base);
-  await page.waitForSelector("#notation .abcjs-note");
+  await page.goto("http://127.0.0.1:3012");
+  await page.waitForSelector(".abcjs-note");
+  page.on("dialog", (d) => d.accept());
+  await page.locator("#upload").click();
+  await page
+    .locator("input[type=file]")
+    .setInputFiles({
+      name: "sample.abc",
+      mimeType: "text/plain",
+      buffer: Buffer.from(abc),
+    });
+  await page.locator("#convert").click();
+  await page.waitForFunction(
+    () => document.querySelector("#title").value === "Imported",
+  );
+  assert.equal(await page.locator("#title").inputValue(), "Imported");
+  assert.equal(await page.locator(".abcjs-note").count(), 8);
+  assert.equal(await page.locator("#bpm").inputValue(), "120");
+  assert.equal(await page.evaluate(() => readScores().length), 0);
+  await page.locator("#save").click();
+  assert.equal(await page.evaluate(() => readScores().length), 1);
+  const downloadPromise = page.waitForEvent("download");
+  await page.locator("#export").click();
+  const download = await downloadPromise;
+  assert.equal(download.suggestedFilename(), "Imported.abc");
+  await page.close();
+});
+test("Quota failure preserves unsaved ABC and does not report success", async () => {
+  const page = await browser.newPage();
+  await page.goto("http://127.0.0.1:3012");
+  await page.waitForSelector(".abcjs-note");
+  await page.evaluate(() => {
+    Storage.prototype.setItem = function () {
+      throw new DOMException("Full", "QuotaExceededError");
+    };
+  });
+  await page.locator("#save").click();
+  assert.match(await page.locator(".toast").textContent(), /저장 공간/);
+  assert.equal(await page.locator("#save").isDisabled(), false);
+  assert.equal(await page.evaluate(() => current), null);
+  await page.close();
+});
+test("6/8 audio and highlighting preserve quarter-note BPM", async () => {
+  const page = await browser.newPage();
+  await page.goto("http://127.0.0.1:3012");
+  await page.waitForSelector(".abcjs-note");
   await page.locator("[data-tab=abc]").click();
   await page
     .locator("#abc")

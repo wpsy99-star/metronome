@@ -24,11 +24,88 @@ function toast(t) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => ($(".toast").style.display = "none"), 5000);
 }
-async function api(url, options = {}) {
-  const r = await fetch(url, options);
-  const body = await r.json();
-  if (!r.ok) throw new Error(body.error || "요청에 실패했습니다.");
-  return body;
+const storageKey = "measure.scores.v1";
+function readScores() {
+  const rows = JSON.parse(localStorage.getItem(storageKey) || "[]");
+  if (
+    !Array.isArray(rows) ||
+    rows.some(
+      (r) =>
+        !r ||
+        typeof r.id !== "string" ||
+        typeof r.title !== "string" ||
+        typeof r.abc !== "string" ||
+        !Number.isInteger(r.bpm) ||
+        r.bpm < 30 ||
+        r.bpm > 240 ||
+        typeof r.created_at !== "string",
+    )
+  )
+    throw new Error(
+      "저장된 악보 데이터가 올바르지 않습니다. 브라우저 데이터를 백업한 뒤 확인하세요.",
+    );
+  return rows;
+}
+async function scoreStore(url, options = {}) {
+  let rows;
+  try {
+    rows = readScores();
+  } catch (e) {
+    throw new Error("브라우저 저장소를 읽지 못했습니다: " + e.message);
+  }
+  const id = url.split("/")[3],
+    method = options.method || "GET";
+  if (method === "GET") {
+    if (!id)
+      return [...rows].sort(
+        (a, b) =>
+          b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id),
+      );
+    const row = rows.find((r) => r.id === id);
+    if (!row) throw new Error("악보를 찾을 수 없습니다.");
+    return row;
+  }
+  if (method === "DELETE") rows = rows.filter((r) => r.id !== id);
+  else {
+    const value = JSON.parse(options.body);
+    if (
+      !value.title ||
+      value.title.length > 200 ||
+      value.abc.length > 500000 ||
+      !/^K:/m.test(value.abc) ||
+      !Number.isInteger(value.bpm) ||
+      value.bpm < 30 ||
+      value.bpm > 240
+    )
+      throw new Error("제목, ABC 코드와 BPM을 확인하세요.");
+    const now = new Date().toISOString();
+    if (method === "POST") {
+      const row = {
+        ...value,
+        id: crypto.randomUUID(),
+        created_at: now,
+        updated_at: now,
+      };
+      rows.push(row);
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(rows));
+      } catch {
+        throw new Error(
+          "저장 공간이 부족하거나 브라우저 저장이 차단되어 있습니다. ABC 파일로 내보내세요.",
+        );
+      }
+      return { id: row.id };
+    }
+    const index = rows.findIndex((r) => r.id === id);
+    if (index < 0) throw new Error("악보를 찾을 수 없습니다.");
+    rows[index] = { ...rows[index], ...value, updated_at: now };
+  }
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(rows));
+  } catch {
+    throw new Error("브라우저에 저장하지 못했습니다. ABC 파일로 내보내세요.");
+  }
+  return { ok: true };
 }
 function payload() {
   return {
@@ -229,7 +306,7 @@ function tab(id) {
   document
     .querySelectorAll("[data-tab]")
     .forEach((b) => b.classList.toggle("active", b.dataset.tab === id));
-  ["score", "abc", "scan"].forEach((k) =>
+  ["score", "abc"].forEach((k) =>
     $("#" + k).classList.toggle("hidden", id !== k),
   );
 }
@@ -238,28 +315,10 @@ function showDetail() {
   $("#detail-view").classList.remove("hidden");
   $(".player").classList.remove("hidden");
 }
-function original() {
-  const scan = $("#scan");
-  scan.replaceChildren();
-  if (!current?.original) {
-    scan.textContent = "이 악보에는 원본 스캔이 없습니다.";
-    return;
-  }
-  const el = document.createElement(
-    current.original.endsWith(".pdf") ? "iframe" : "img",
-  );
-  el.src = "/api/scores/" + current.id + "/original";
-  el.className = "score-original";
-  if (el.tagName === "IFRAME") {
-    el.title = "원본 스캔 PDF";
-    el.style.height = "600px";
-  } else el.alt = "원본 스캔 악보";
-  scan.append(el);
-}
 async function openScore(id, force = false) {
   if (!force && !checkLeave()) return;
   try {
-    const row = await api("/api/scores/" + id);
+    const row = await scoreStore("/api/scores/" + id);
     invalidate();
     current = row;
     $("#title").value = row.title;
@@ -269,7 +328,6 @@ async function openScore(id, force = false) {
     baseline = JSON.stringify(payload());
     showDetail();
     render();
-    original();
     tab("score");
     renderRecent();
   } catch (e) {
@@ -317,14 +375,14 @@ function renderList() {
       : "악보를 가져오거나 ABC 코드를 직접 입력하세요.";
 }
 async function refresh() {
-  scores = await api("/api/scores");
+  scores = await scoreStore("/api/scores");
   renderRecent();
   renderList();
 }
 async function remove(id, title) {
   if (!confirm("“" + title + "” 악보를 삭제할까요?")) return;
   try {
-    await api("/api/scores/" + id, { method: "DELETE" });
+    await scoreStore("/api/scores/" + id, { method: "DELETE" });
     if (current?.id === id) {
       newScore();
       baseline = JSON.stringify(payload());
@@ -347,7 +405,6 @@ function newScore() {
   baseline = "";
   showDetail();
   render();
-  original();
   tab("abc");
   $("#abc").focus();
 }
@@ -365,7 +422,7 @@ $("#save").onclick = async () => {
   try {
     if (!renderValid) throw new Error("ABC 코드를 먼저 확인하세요.");
     const isNew = !current;
-    const result = await api(
+    const result = await scoreStore(
       isNew ? "/api/scores" : "/api/scores/" + current.id,
       {
         method: isNew ? "POST" : "PUT",
@@ -373,11 +430,11 @@ $("#save").onclick = async () => {
         body: JSON.stringify(payload()),
       },
     );
-    if (isNew) current = await api("/api/scores/" + result.id);
+    if (isNew) current = await scoreStore("/api/scores/" + result.id);
     baseline = JSON.stringify(payload());
     updateDirty();
     await refresh();
-    toast("악보를 저장했습니다.");
+    toast("이 브라우저에 악보를 저장했습니다.");
   } catch (e) {
     toast(e.message);
     updateDirty();
@@ -435,28 +492,52 @@ $("#upload").onclick = $("#library-upload").onclick = () => {
 };
 $("#convert").onclick = async () => {
   const file = $("input[type=file]").files[0];
-  if (!file) {
-    toast("파일을 선택하세요.");
-    return;
-  }
-  const button = $("#convert");
-  button.disabled = true;
-  $("#import-status").textContent =
-    "악보를 인식하고 있습니다. 최대 4분 정도 걸릴 수 있습니다.";
-  const form = new FormData();
-  form.append("file", file);
+  if (!file) return toast("ABC 파일을 선택하세요.");
+  if (!/\.abc$/i.test(file.name) || file.size > 500000)
+    return toast("500KB 이하의 .abc 파일을 선택하세요.");
   try {
-    const r = await api("/api/import", { method: "POST", body: form });
-    await refresh();
-    await openScore(r.id, true);
+    const text = (await file.text()).replace(/^\uFEFF/, "");
+    if (!/^K:/m.test(text))
+      throw new Error("ABC 코드에 K: 조성 항목이 필요합니다.");
+    if ((text.match(/^X:/gm) || []).length > 1)
+      throw new Error("한 파일에 한 곡만 넣어주세요.");
+    invalidate();
+    current = null;
+    $("#abc").value = text;
+    $("#title").value = (
+      text.match(/^T:(.*)$/m)?.[1].trim() || file.name.replace(/\.abc$/i, "")
+    ).slice(0, 200);
+    const bpm = Number(text.match(/^Q:\s*(?:1\/4\s*=\s*)?(\d+)/m)?.[1]) || 100;
+    $("#bpm").value = $("#range").value = Math.max(30, Math.min(240, bpm));
+    $("#player-bpm").textContent = $("#bpm").value + " BPM";
+    baseline = "";
+    showDetail();
+    render();
+    tab("score");
     $("dialog").close();
-    toast(r.warning);
+    toast(
+      "ABC 파일을 가져왔습니다. 변경사항 저장을 누르면 이 브라우저에 보관됩니다.",
+    );
   } catch (e) {
     $("#import-status").textContent = e.message;
-  } finally {
-    button.disabled = false;
   }
 };
+$("#export").onclick = () => {
+  const blob = new Blob([$("#abc").value], {
+    type: "text/plain;charset=utf-8",
+  });
+  const url = URL.createObjectURL(blob),
+    link = document.createElement("a");
+  link.href = url;
+  link.download =
+    ($("#title").value.trim() || "score").replace(/[\/\\:*?"<>|]/g, "_") +
+    ".abc";
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+window.addEventListener("storage", (e) => {
+  if (e.key === storageKey) refresh().catch((e) => toast(e.message));
+});
 window.addEventListener("beforeunload", (e) => {
   if (dirty()) e.preventDefault();
 });
@@ -470,11 +551,7 @@ window.addEventListener("beforeunload", (e) => {
       $("#abc").value = example;
       baseline = "";
       render();
-      original();
     }
-    const status = await api("/api/status");
-    if (!status.omr)
-      $("#import-status").textContent = "스캔 인식 엔진이 설치되지 않았습니다.";
   } catch (e) {
     toast(e.message);
   }

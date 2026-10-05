@@ -1,10 +1,10 @@
 {
   "name": "measure",
   "version": "1.0.0",
-  "description": "스캔 악보를 가져와 템포를 조절하고 음표를 클릭한 위치부터 연습하는 앱의 UI 시안입니다.",
-  "main": "index.js",
+  "description": "ABC 악보 편집과 음표 클릭 재생, 브라우저 저장을 지원하는 정적 웹 앱",
   "scripts": {
-    "start": "node server.js",
+    "build": "node scripts/build.js",
+    "start": "npm run build && node scripts/serve.js",
     "test": "node --test tests/*.test.js"
   },
   "repository": {
@@ -20,12 +20,10 @@
   },
   "homepage": "https://github.com/wpsy99-star/metronome#readme",
   "dependencies": {
-    "abcjs": "^6.7.1",
-    "express": "^5.2.1",
-    "multer": "^2.4.0"
+    "abcjs": "^6.7.1"
   },
   "engines": {
-    "node": ">=22.13"
+    "node": ">=22"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0"
