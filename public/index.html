@@ -444,6 +444,27 @@
       textarea {
         outline-offset: 2px;
       }
+    
+      main { max-width:none; padding:24px 32px 110px; }
+      .workspace { display:flex; flex-direction:column; gap:16px; min-width:0; }
+      .workspace > .paper { width:100%; min-width:0; padding:22px 24px; }
+      .settings { display:flex; align-items:center; flex-wrap:wrap; gap:16px 24px; padding:14px 20px; }
+      .settings h3 { margin:0; white-space:nowrap; }
+      .tempo-controls { display:flex; align-items:center; gap:12px; flex:1 1 280px; max-width:440px; }
+      .tempo-controls .bpm { margin:0; gap:4px; }
+      .tempo-controls .bpm input { font-size:26px; width:70px; }
+      .tempo-controls input[type="range"] { flex:1; min-width:90px; width:auto; }
+      .practice-options { display:flex; align-items:center; flex-wrap:wrap; gap:12px 20px; font-size:13px; }
+      .practice-options label { white-space:nowrap; }
+      .practice-tip { font-size:12px; color:#7b8779; }
+      @media(max-width:680px) {
+        main { padding:20px 12px 120px; }
+        .settings { padding:12px 14px; gap:10px 14px; }
+        .tempo-controls { flex-basis:100%; max-width:none; }
+        .practice-tip { display:none; }
+        .workspace > .paper { padding:14px 10px; }
+        .heading { margin:18px 0; }
+      }
     </style>
   </head>
   <body>
@@ -542,6 +563,19 @@
             </div>
           </div>
           <div class="workspace">
+            <section class="settings" aria-label="연습 설정">
+              <h3>연습 설정</h3>
+              <div class="tempo-controls">
+                <label for="bpm" class="muted">템포</label>
+                <div class="bpm"><input id="bpm" type="number" min="30" max="240" value="100" aria-label="BPM"><span class="muted">BPM</span></div>
+                <input id="range" type="range" min="30" max="240" value="100" aria-label="템포 조절">
+              </div>
+              <div class="practice-options">
+                <label><input id="highlight" type="checkbox" checked> 음표 색상 표시</label>
+                <label><input id="metronome" type="checkbox"> 메트로놈 소리</label>
+              </div>
+              <span class="practice-tip">음표를 클릭해 원하는 위치부터 연습하세요.</span>
+            </section>
             <section class="paper">
               <div class="paper-head">
                 <div class="tabs">
@@ -583,50 +617,7 @@ C C G G | A A G2 | F F E E | D D C2 |
 G G F F | E E D2 | G G F F | E E D2 |
 C C G G | A A G2 | F F E E | D D C2 |]</textarea>
             </section>
-            <section class="settings">
-              <h3>연습 설정</h3>
-              <div class="setting">
-                <span class="muted">템포</span>
-                <div class="bpm">
-                  <input
-                    id="bpm"
-                    type="number"
-                    min="30"
-                    max="240"
-                    value="100"
-                    aria-label="BPM"
-                  /><span class="muted">BPM</span>
-                </div>
-                <input
-                  id="range"
-                  type="range"
-                  min="30"
-                  max="240"
-                  value="100"
-                  aria-label="템포 조절"
-                />
-                <div class="muted">느리게 ← → 빠르게</div>
-              </div>
-              <div class="setting">
-                <span>음표에서 바로 연습</span>
-                <p class="hint">
-                  음표를 클릭하면 그 음부터 재생을 시작합니다. 재생 중인 음표는
-                  주황색으로 표시됩니다.
-                </p>
-              </div>
-              <div class="setting">
-                <label
-                  ><input id="highlight" type="checkbox" checked /> 음표 색상
-                  표시</label
-                ><br /><br /><label
-                  ><input id="metronome" type="checkbox" /> 메트로놈 소리</label
-                >
-              </div>
-              <div class="hint">
-                시작하고 싶은 음표를 클릭하세요. 재생 중인 음표에 주황색이
-                표시됩니다.
-              </div>
-            </section>
+
           </div>
         </section>
       </main>
