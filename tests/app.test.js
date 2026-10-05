@@ -71,7 +71,9 @@ test("Static browser app: edit/save/reload, note seek and audio, recent five, li
         method: "POST",
         body: JSON.stringify({
           title: "Item " + i,
-          abc: document.querySelector("#abc").value,
+          abc: document
+            .querySelector("#abc")
+            .value.replace(/^T:.*$/m, "T:Item " + i),
           bpm: 100,
         }),
       });
@@ -283,4 +285,45 @@ test("Build refuses secret Supabase keys", () => {
       }
     });
   });
+});
+
+test("ABC T title drives editor, saved library and reopened legacy scores", async () => {
+  const page = await browser.newPage();
+  await page.goto("http://127.0.0.1:3012");
+  await page.waitForSelector(".abcjs-note");
+  page.on("dialog", (d) => d.accept());
+  await page.locator("#new-abc").click();
+  await page
+    .locator("#abc")
+    .fill("X:1\nT:달빛 연습\nT:부제\nM:4/4\nL:1/4\nK:C\nC D E F |]");
+  await page.waitForFunction(() => !document.querySelector("#save").disabled);
+  assert.equal(await page.locator("#title").inputValue(), "달빛 연습");
+  await page.locator("#save").click();
+  await page.reload();
+  await page.waitForSelector(".abcjs-note");
+  assert.equal(await page.locator("#title").inputValue(), "달빛 연습");
+  assert.match(await page.locator("#recent-scores").textContent(), /달빛 연습/);
+  await page.locator("#title").fill("수정한 제목");
+  assert.match(await page.locator("#abc").inputValue(), /^T:수정한 제목$/m);
+  assert.match(await page.locator("#abc").inputValue(), /^T:부제$/m);
+  await page.locator("#save").click();
+  await page.reload();
+  await page.waitForSelector(".abcjs-note");
+  assert.equal(await page.locator("#title").inputValue(), "수정한 제목");
+  await page.evaluate(() => {
+    const rows = readScores();
+    rows[0].title = "새 악보";
+    localStorage.setItem(storageKey, JSON.stringify(rows));
+  });
+  await page.reload();
+  await page.waitForSelector(".abcjs-note");
+  assert.equal(await page.locator("#title").inputValue(), "수정한 제목");
+  assert.match(
+    await page.locator("#recent-scores").textContent(),
+    /수정한 제목/,
+  );
+  assert.equal(await page.locator("#save").isDisabled(), false);
+  await page.locator("#save").click();
+  assert.equal(await page.evaluate(() => readScores()[0].title), "수정한 제목");
+  await page.close();
 });

@@ -180,6 +180,16 @@ async function scoreStore(url, options = {}) {
   }
   return { ok: true };
 }
+function abcTitle(abc) {
+  const header = abc.split(/^K:/m)[0];
+  return (header.match(/^T:[ \t]*([^\r\n]*)/m)?.[1].trim() || "").slice(0, 200);
+}
+function syncTitleFromAbc() {
+  const title = abcTitle($("#abc").value);
+  if (title) $("#title").value = title;
+  $("#player-title").textContent = $("#title").value;
+  $("#breadcrumb").textContent = "내 악보 / " + $("#title").value;
+}
 function payload() {
   return {
     title: $("#title").value.trim(),
@@ -394,11 +404,11 @@ async function openScore(id, force = false) {
     const row = await scoreStore("/api/scores/" + id);
     invalidate();
     current = row;
-    $("#title").value = row.title;
+    $("#title").value = abcTitle(row.abc) || row.title;
     $("#abc").value = row.abc;
     $("#bpm").value = $("#range").value = row.bpm;
     $("#player-bpm").textContent = row.bpm + " BPM";
-    baseline = JSON.stringify(payload());
+    baseline = JSON.stringify({ ...payload(), title: row.title });
     showDetail();
     render();
     tab("score");
@@ -448,7 +458,10 @@ function renderList() {
       : "악보를 가져오거나 ABC 코드를 직접 입력하세요.";
 }
 async function refresh() {
-  scores = await scoreStore("/api/scores");
+  scores = (await scoreStore("/api/scores")).map((row) => ({
+    ...row,
+    title: abcTitle(row.abc) || row.title,
+  }));
   renderRecent();
   renderList();
 }
@@ -519,6 +532,7 @@ $("#save").onclick = async () => {
 };
 $("#delete").onclick = () => current && remove(current.id, current.title);
 $("#abc").oninput = () => {
+  syncTitleFromAbc();
   invalidate();
   renderValid = false;
   $("#save").disabled = true;
@@ -527,8 +541,14 @@ $("#abc").oninput = () => {
   editTimer = setTimeout(render, 350);
 };
 $("#title").oninput = () => {
-  updateDirty();
-  $("#player-title").textContent = $("#title").value;
+  const value = $("#title").value.replace(/[\r\n]/g, "");
+  const abc = $("#abc").value;
+  const keyIndex = abc.search(/^K:/m);
+  const header = keyIndex < 0 ? abc : abc.slice(0, keyIndex);
+  $("#abc").value = /^T:/m.test(header)
+    ? abc.replace(/^T:[^\r\n]*/m, () => "T:" + value)
+    : "T:" + value + "\n" + abc;
+  render();
 };
 function tempo(value) {
   const n = Math.min(240, Math.max(30, Number(value) || 100));
@@ -582,7 +602,7 @@ $("#convert").onclick = async () => {
     current = null;
     $("#abc").value = text;
     $("#title").value = (
-      text.match(/^T:(.*)$/m)?.[1].trim() || file.name.replace(/\.abc$/i, "")
+      abcTitle(text) || file.name.replace(/\.abc$/i, "")
     ).slice(0, 200);
     const bpm = Number(text.match(/^Q:\s*(?:1\/4\s*=\s*)?(\d+)/m)?.[1]) || 100;
     $("#bpm").value = $("#range").value = Math.max(30, Math.min(240, bpm));
@@ -627,6 +647,7 @@ window.addEventListener("beforeunload", (e) => {
       current = null;
       $("#title").value = "작은 별";
       $("#abc").value = example;
+      syncTitleFromAbc();
       baseline = "";
       render();
     }
