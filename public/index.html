@@ -450,7 +450,9 @@
     <div class="app">
       <aside>
         <div class="logo">♫ measure</div>
-        <div class="tag">나만의 악보 연습실 · 브라우저 저장</div>
+        <div class="tag">
+          나만의 악보 연습실 · <span id="storage-mode">브라우저 저장</span>
+        </div>
         <button class="primary upload" id="upload">＋ ABC 파일 가져오기</button
         ><button
           id="library-open"
@@ -659,8 +661,7 @@ C C G G | A A G2 | F F E E | D D C2 |]</textarea>
         />
       </div>
       <p class="hint">
-        악보는 현재 브라우저에 저장됩니다. 다른 기기와 자동 동기화되지 않습니다.
-        필요한 악보는 ABC 파일로 내보내 보관하세요.
+        <span id="storage-info">악보는 현재 브라우저에 저장되며 다른 기기와 자동 동기화되지 않습니다.</span> 필요한 악보는 ABC 파일로 내보내 보관하세요.
       </p>
       <p id="import-status" role="status" class="hint"></p>
       <div class="actions">
@@ -670,6 +671,7 @@ C C G G | A A G2 | F F E E | D D C2 |]</textarea>
     </dialog>
     <div class="toast" role="status"></div>
     <script src="/vendor/abcjs-basic-min.js"></script>
+    <script src="/config.js"></script>
     <script src="/app.js"></script>
   </body>
 </html>

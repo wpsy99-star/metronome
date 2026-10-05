@@ -5,3 +5,6 @@ tools/audiveris/
 __pycache__/
 dist/
 .vercel/
+.env
+.env.local
+.env.*.local

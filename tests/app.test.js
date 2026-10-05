@@ -100,13 +100,11 @@ test("ABC file import, manual save and export", async () => {
   await page.waitForSelector(".abcjs-note");
   page.on("dialog", (d) => d.accept());
   await page.locator("#upload").click();
-  await page
-    .locator("input[type=file]")
-    .setInputFiles({
-      name: "sample.abc",
-      mimeType: "text/plain",
-      buffer: Buffer.from(abc),
-    });
+  await page.locator("input[type=file]").setInputFiles({
+    name: "sample.abc",
+    mimeType: "text/plain",
+    buffer: Buffer.from(abc),
+  });
   await page.locator("#convert").click();
   await page.waitForFunction(
     () => document.querySelector("#title").value === "Imported",
@@ -160,4 +158,129 @@ test("6/8 audio and highlighting preserve quarter-note BPM", async () => {
   assert.equal(state.end, 3000);
   assert(Math.abs(state.duration - 3) < 0.5);
   await page.close();
+});
+
+test("Supabase adapter CRUD with public key; failed writes stay unsaved without local fallback", async () => {
+  const page = await browser.newPage();
+  let rows = [],
+    failure = false;
+  const methods = [];
+  await page.route("**/config.js", (route) =>
+    route.fulfill({
+      contentType: "text/javascript",
+      body: 'window.MEASURE_CONFIG={supabaseUrl:"https://example.supabase.co",supabaseKey:"sb_publishable_test"};',
+    }),
+  );
+  await page.route(
+    "https://example.supabase.co/rest/v1/measure_scores**",
+    async (route) => {
+      const request = route.request(),
+        method = request.method();
+      methods.push(method);
+      assert.equal(request.headers().apikey, "sb_publishable_test");
+      assert.equal(request.headers().authorization, undefined);
+      if (failure && method === "PATCH")
+        return route.fulfill({
+          status: 403,
+          contentType: "application/json",
+          body: JSON.stringify({ code: "42501" }),
+        });
+      const id = new URL(request.url()).searchParams
+        .get("id")
+        ?.replace(/^eq\./, "");
+      let result;
+      if (method === "GET")
+        result = id ? rows.filter((r) => r.id === id) : rows;
+      if (method === "POST") {
+        const r = {
+          ...request.postDataJSON(),
+          id: "8cab7796-98af-49e3-a911-6c8745f2102b",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        rows.push(r);
+        result = [r];
+      }
+      if (method === "PATCH") {
+        rows = rows.map((r) =>
+          r.id === id ? { ...r, ...request.postDataJSON() } : r,
+        );
+        result = rows.filter((r) => r.id === id);
+      }
+      if (method === "DELETE") {
+        result = rows.filter((r) => r.id === id);
+        rows = rows.filter((r) => r.id !== id);
+      }
+      await route.fulfill({
+        status: method === "POST" ? 201 : 200,
+        contentType: "application/json",
+        body: JSON.stringify(result),
+      });
+    },
+  );
+  await page.goto("http://127.0.0.1:3012");
+  await page.waitForSelector(".abcjs-note");
+  assert.match(await page.locator("#storage-mode").textContent(), /Supabase/);
+  await page.locator("#save").click();
+  await page.waitForFunction(
+    () => document.querySelector("#save-status").textContent === "저장됨",
+  );
+  assert.equal(rows.length, 1);
+  await page.reload();
+  await page.waitForSelector(".abcjs-note");
+  assert.equal(await page.locator("#title").inputValue(), rows[0].title);
+  await page.locator("#title").fill("Cloud update");
+  await page.locator("#save").click();
+  await page.waitForFunction(
+    () => document.querySelector("#save-status").textContent === "저장됨",
+  );
+  assert.equal(rows[0].title, "Cloud update");
+  failure = true;
+  await page.locator("#title").fill("Unsaved");
+  await page.locator("#save").click();
+  await page.waitForFunction(() =>
+    document.querySelector(".toast").textContent.includes("RLS"),
+  );
+  assert.equal(await page.locator("#save").isDisabled(), false);
+  assert.equal(rows[0].title, "Cloud update");
+  assert.equal(
+    await page.evaluate(() => localStorage.getItem(storageKey)),
+    null,
+  );
+  failure = false;
+  page.on("dialog", (d) => d.accept());
+  await page.locator("#delete").click();
+  await page.waitForFunction(() =>
+    document.querySelector("#all-scores").textContent.includes("ABC"),
+  );
+  assert.equal(rows.length, 0);
+  assert(
+    methods.includes("POST") &&
+      methods.includes("PATCH") &&
+      methods.includes("DELETE"),
+  );
+  await page.close();
+});
+test("Build refuses secret Supabase keys", () => {
+  const result = spawn(process.execPath, ["scripts/build.js"], {
+    env: {
+      ...process.env,
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_PUBLISHABLE_KEY: "sb_secret_do_not_expose",
+    },
+    stdio: "pipe",
+  });
+  return new Promise((resolve, reject) => {
+    let error = "";
+    result.stderr.on("data", (b) => (error += b));
+    result.on("exit", (code) => {
+      try {
+        assert.equal(code, 1);
+        assert.match(error, /service_role\/secret/);
+        resolve();
+      } catch (e) {
+        reject(e);
+      }
+    });
+  });
 });

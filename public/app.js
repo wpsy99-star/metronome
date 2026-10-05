@@ -46,7 +46,80 @@ function readScores() {
     );
   return rows;
 }
+const storageConfig = window.MEASURE_CONFIG || {};
+const cloudStorage = !!storageConfig.supabaseUrl && !!storageConfig.supabaseKey;
+$("#storage-mode").textContent = cloudStorage
+  ? "Supabase 공유 저장"
+  : "브라우저 저장";
+if (cloudStorage)
+  $("#storage-info").textContent =
+    "이 사이트의 악보는 Supabase에 저장되어 접속자들이 공유합니다.";
+async function cloudStore(url, options = {}) {
+  const id = url.split("/")[3],
+    method = options.method || "GET";
+  const headers = {
+    apikey: storageConfig.supabaseKey,
+    "Content-Type": "application/json",
+  };
+  if (storageConfig.supabaseKey.startsWith("eyJ"))
+    headers.Authorization = "Bearer " + storageConfig.supabaseKey;
+  const base = storageConfig.supabaseUrl + "/rest/v1/measure_scores";
+  let target = base + (id ? "?id=eq." + encodeURIComponent(id) : "");
+  const init = { method: method === "PUT" ? "PATCH" : method, headers };
+  if (method !== "GET") headers.Prefer = "return=representation";
+  if (options.body) init.body = options.body;
+  async function request(endpoint, requestOptions) {
+    let response;
+    try {
+      response = await fetch(endpoint, {
+        ...requestOptions,
+        signal: AbortSignal.timeout(15000),
+      });
+    } catch {
+      throw new Error(
+        "Supabase에 연결하지 못했습니다. 연결을 확인하세요. 편집 내용은 유지됩니다.",
+      );
+    }
+    if (!response.ok) {
+      const detail = await response.json().catch(() => ({}));
+      if (response.status === 401 || response.status === 403)
+        throw new Error("Supabase 키와 테이블 접근 정책(RLS)을 확인하세요.");
+      if (detail.code === "PGRST205" || detail.code === "42P01")
+        throw new Error(
+          "Supabase 테이블이 없습니다. supabase/schema.sql을 실행하세요.",
+        );
+      throw new Error(
+        "Supabase 저장 요청이 실패했습니다. (" + response.status + ")",
+      );
+    }
+    return response.status === 204 ? [] : response.json();
+  }
+  if (method === "GET" && !id) {
+    const all = [];
+    for (let offset = 0; ; offset += 1000) {
+      const page = await request(
+        base +
+          "?select=*&order=created_at.desc,id.desc&limit=1000&offset=" +
+          offset,
+        init,
+      );
+      all.push(...page);
+      if (page.length < 1000) return all;
+    }
+  }
+  const rows = await request(target, init);
+  if (method === "POST") {
+    if (!rows[0]) throw new Error("Supabase 저장 결과를 확인하지 못했습니다.");
+    return { id: rows[0].id };
+  }
+  if (!rows.length)
+    throw new Error(
+      "악보가 없거나 접근 권한이 없습니다. 목록을 새로고침하세요.",
+    );
+  return method === "GET" ? rows[0] : { ok: true };
+}
 async function scoreStore(url, options = {}) {
+  if (cloudStorage) return cloudStore(url, options);
   let rows;
   try {
     rows = readScores();
@@ -434,7 +507,11 @@ $("#save").onclick = async () => {
     baseline = JSON.stringify(payload());
     updateDirty();
     await refresh();
-    toast("이 브라우저에 악보를 저장했습니다.");
+    toast(
+      cloudStorage
+        ? "Supabase에 악보를 저장했습니다."
+        : "이 브라우저에 악보를 저장했습니다.",
+    );
   } catch (e) {
     toast(e.message);
     updateDirty();
@@ -516,7 +593,7 @@ $("#convert").onclick = async () => {
     tab("score");
     $("dialog").close();
     toast(
-      "ABC 파일을 가져왔습니다. 변경사항 저장을 누르면 이 브라우저에 보관됩니다.",
+      "ABC 파일을 가져왔습니다. 변경사항 저장을 누르면 선택한 저장소에 보관됩니다.",
     );
   } catch (e) {
     $("#import-status").textContent = e.message;
@@ -536,7 +613,8 @@ $("#export").onclick = () => {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 window.addEventListener("storage", (e) => {
-  if (e.key === storageKey) refresh().catch((e) => toast(e.message));
+  if (!cloudStorage && e.key === storageKey)
+    refresh().catch((e) => toast(e.message));
 });
 window.addEventListener("beforeunload", (e) => {
   if (dirty()) e.preventDefault();
