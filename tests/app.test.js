@@ -20,7 +20,7 @@ before(async () => {
   browser = await chromium.launch({
     executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium",
     headless: true,
-    args: ["--no-sandbox", "--autoplay-policy=no-user-gesture-required"],
+    args: ["--no-sandbox"],
   });
 });
 after(async () => {
@@ -390,5 +390,56 @@ test("Clarinet timbre transposes written C to Bb and switches exclusively during
   assert.equal(await page.locator("#instrument-clarinet").isChecked(), true);
   assert.equal(await page.locator("#instrument-piano").isChecked(), false);
   assert.deepEqual(errors, []);
+  await page.close();
+});
+
+test("Cached playback resumes a suspended audio context and produces live output", async () => {
+  const page = await browser.newPage();
+  await page.goto("http://127.0.0.1:3012");
+  await page.waitForSelector(".abcjs-note");
+  await page.locator("#play").click();
+  await page.waitForFunction(() => playing);
+  await page.locator("#play").click();
+  await page.evaluate(() => audio.suspend());
+  assert.equal(await page.evaluate(() => audio.state), "suspended");
+  await page.locator("#play").click();
+  await page.waitForFunction(() => playing && audio.state === "running");
+  const rms = await page.evaluate(async () => {
+    const analyser = audio.createAnalyser(),
+      mute = audio.createGain();
+    mute.gain.value = 0;
+    analyser.connect(mute).connect(audio.destination);
+    synth.directSource.forEach((source) => source.connect(analyser));
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const samples = new Float32Array(analyser.fftSize);
+    analyser.getFloatTimeDomainData(samples);
+    const rms = Math.sqrt(
+      samples.reduce((sum, v) => sum + v * v, 0) / samples.length,
+    );
+    analyser.disconnect();
+    mute.disconnect();
+    return rms;
+  });
+  assert(rms > 0.001, "live source output is audible");
+  await page.locator("#reset").click();
+  await page.locator("#sound-test").click();
+  assert.match(await page.locator("#audio-status").textContent(), /테스트음/);
+  await page.close();
+});
+test("Missing instrument sample shows persistent error instead of silent playback", async () => {
+  const page = await browser.newPage();
+  await page.route("**/soundfonts/**", (route) =>
+    route.fulfill({ status: 404, body: "Not found" }),
+  );
+  await page.goto("http://127.0.0.1:3012");
+  await page.waitForSelector(".abcjs-note");
+  await page.locator("#play").click();
+  await page.waitForFunction(() =>
+    document
+      .querySelector("#audio-status")
+      .textContent.includes("음원을 불러오지"),
+  );
+  assert.equal(await page.evaluate(() => playing), false);
+  assert.equal(await page.locator("#play").isDisabled(), false);
   await page.close();
 });

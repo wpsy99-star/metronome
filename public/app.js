@@ -260,7 +260,7 @@ function render() {
       selectTypes: ["note"],
       clickListener: (abcelem) => {
         if (abcelem.el_type !== "note") return;
-        playFrom(abcelem.startChar).catch((e) => toast(e.message));
+        playFrom(abcelem.startChar).catch(reportAudioError);
       },
     })[0];
     visual = tune;
@@ -322,16 +322,58 @@ for (const name of Object.keys(instrumentChoices))
     try {
       localStorage.setItem("measure.instrument.v1", name);
     } catch {}
-    if (resume) playFrom().catch((e) => toast(e.message));
+    if (resume) playFrom().catch(reportAudioError);
   };
 updateInstrumentControls();
+function reportAudioError(error) {
+  const message = error?.message || "오디오 재생에 실패했습니다.";
+  $("#audio-status").textContent = message;
+  toast(message);
+}
+async function activateAudio() {
+  const Context = window.AudioContext || window.webkitAudioContext;
+  if (!Context) throw new Error("이 브라우저는 오디오를 지원하지 않습니다.");
+  if (!audio || audio.state === "closed") {
+    synth = null;
+    audio = new Context();
+  }
+  await audio.resume();
+  if (audio.state !== "running")
+    throw new Error(
+      "브라우저가 소리를 차단했습니다. 사이트의 소리 권한을 확인하고 다시 눌러주세요.",
+    );
+  return audio;
+}
+$("#sound-test").onclick = async () => {
+  try {
+    const context = await activateAudio();
+    const tone = context.createOscillator(),
+      gain = context.createGain();
+    tone.frequency.value = 440;
+    gain.gain.setValueAtTime(0, context.currentTime);
+    gain.gain.linearRampToValueAtTime(0.15, context.currentTime + 0.02);
+    gain.gain.setValueAtTime(0.15, context.currentTime + 0.6);
+    gain.gain.linearRampToValueAtTime(0, context.currentTime + 0.8);
+    tone.connect(gain).connect(context.destination);
+    tone.start();
+    tone.stop(context.currentTime + 0.8);
+    tone.onended = () => {
+      tone.disconnect();
+      gain.disconnect();
+    };
+    $("#audio-status").textContent =
+      "테스트음을 재생했습니다. 안 들리면 탭 음소거와 기기 소리 출력을 확인하세요.";
+  } catch (error) {
+    reportAudioError(error);
+  }
+};
 async function prepare() {
+  await activateAudio();
   if (synth) return;
   if (!renderValid) throw new Error("먼저 유효한 ABC 악보를 입력하세요.");
   if (!ABCJS.synth.supportsAudio())
     throw new Error("이 브라우저는 오디오 재생을 지원하지 않습니다.");
-  audio = audio || new AudioContext();
-  await audio.resume();
+  ABCJS.synth.registerAudioContext(audio);
   const token = generation;
   const buffer = new ABCJS.synth.CreateSynth();
   const instrument = instrumentChoices[selectedInstrument];
@@ -354,13 +396,35 @@ async function prepare() {
       "선택한 악기의 실제 재생 음높이가 A0–C8 범위를 벗어났습니다. ABC 음높이를 확인하세요.",
     );
   const meter = visual.getMeterFraction();
-  await buffer.init({
+  let sampleError = false;
+  const loaded = await buffer.init({
     audioContext: audio,
+    debugCallback: (message) => {
+      if (String(message).includes("loadBatch catch")) sampleError = true;
+    },
     sequence,
     millisecondsPerMeasure: 240000 / Number($("#bpm").value),
-    options: { soundFontUrl: "/soundfonts/", soundFontVolumeMultiplier: 1 },
+    options: { soundFontUrl: "/soundfonts/", soundFontVolumeMultiplier: 3 },
   });
+  if (sampleError || loaded.error?.length)
+    throw new Error(
+      "악기 음원을 불러오지 못했습니다. 페이지를 새로고침하고 다시 시도하세요.",
+    );
   await buffer.prime();
+  if (
+    sequence.tracks.some((track) => track.some((e) => e.cmd === "note")) &&
+    !buffer.audioBuffers.some((b) => {
+      for (let channel = 0; channel < b.numberOfChannels; channel++)
+        if (
+          b.getChannelData(channel).some((value) => Math.abs(value) > 0.000001)
+        )
+          return true;
+      return false;
+    })
+  )
+    throw new Error(
+      "악보의 오디오 데이터가 무음입니다. ABC 볼륨 설정과 음원 로딩을 확인하세요.",
+    );
   if (token !== generation)
     throw new Error("악보가 변경되었습니다. 다시 재생하세요.");
   synth = buffer;
@@ -421,7 +485,10 @@ async function playFrom(char) {
     const total = timings.at(-1)?.milliseconds || 0;
     if (position >= total) position = 0;
     synth.seek(position / 1000, "seconds");
+    await activateAudio();
     synth.start();
+    $("#audio-status").textContent =
+      instrumentChoices[selectedInstrument].name + " 오디오 재생 중";
     startClock = audio.currentTime - position / 1000;
     metronome(position / 1000, total / 1000);
     playing = true;
@@ -607,14 +674,14 @@ $("#bpm").onchange = (e) => tempo(e.target.value);
 $("#range").oninput = (e) => tempo(e.target.value);
 $("#play").onclick = () => {
   if (playing) stop();
-  else playFrom().catch((e) => toast(e.message));
+  else playFrom().catch(reportAudioError);
 };
 $("#reset").onclick = () => stop(true);
 $("#highlight").onchange = () => {
   if (!$("#highlight").checked) clearHighlight();
 };
 $("#metronome").onchange = () => {
-  if (playing) playFrom().catch((e) => toast(e.message));
+  if (playing) playFrom().catch(reportAudioError);
 };
 document.querySelectorAll("[data-tab]").forEach(
   (b) =>
