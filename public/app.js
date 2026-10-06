@@ -282,6 +282,49 @@ function render() {
   }
   updateDirty();
 }
+const instrumentChoices = {
+  piano: {
+    program: 0,
+    transpose: 0,
+    name: "피아노",
+    description: "악보 그대로 재생",
+  },
+  clarinet: {
+    program: 71,
+    transpose: -2,
+    name: "B♭ 클라리넷",
+    description: "악보보다 한 음 낮게 · 도 → 시♭",
+  },
+};
+let selectedInstrument = "piano";
+try {
+  if (localStorage.getItem("measure.instrument.v1") === "clarinet")
+    selectedInstrument = "clarinet";
+} catch {}
+function updateInstrumentControls() {
+  for (const name of Object.keys(instrumentChoices))
+    $("#instrument-" + name).checked = selectedInstrument === name;
+  $("#instrument-description").textContent =
+    instrumentChoices[selectedInstrument].description;
+  $("#player-instrument").textContent =
+    "· " + instrumentChoices[selectedInstrument].name + " 재생";
+}
+for (const name of Object.keys(instrumentChoices))
+  $("#instrument-" + name).onchange = () => {
+    if (name === selectedInstrument) {
+      updateInstrumentControls();
+      return;
+    }
+    const resume = playing;
+    invalidate();
+    selectedInstrument = name;
+    updateInstrumentControls();
+    try {
+      localStorage.setItem("measure.instrument.v1", name);
+    } catch {}
+    if (resume) playFrom().catch((e) => toast(e.message));
+  };
+updateInstrumentControls();
 async function prepare() {
   if (synth) return;
   if (!renderValid) throw new Error("먼저 유효한 ABC 악보를 입력하세요.");
@@ -291,7 +334,15 @@ async function prepare() {
   await audio.resume();
   const token = generation;
   const buffer = new ABCJS.synth.CreateSynth();
+  const instrument = instrumentChoices[selectedInstrument];
   const sequence = visual.setUpAudio({});
+  sequence.tracks.forEach((track) =>
+    track.forEach((event) => {
+      if (event.pitch !== undefined) event.pitch += instrument.transpose;
+      if (event.cmd === "program" || event.instrument !== undefined)
+        event.instrument = instrument.program;
+    }),
+  );
   if (
     sequence.tracks.some((track) =>
       track.some(
@@ -299,13 +350,9 @@ async function prepare() {
       ),
     )
   )
-    throw new Error("피아노 재생 범위는 A0–C8입니다. ABC 음높이를 확인하세요.");
-  sequence.tracks.forEach((track) =>
-    track.forEach((e) => {
-      if (e.cmd === "program") e.instrument = 0;
-      if (e.instrument !== undefined) e.instrument = 0;
-    }),
-  );
+    throw new Error(
+      "선택한 악기의 실제 재생 음높이가 A0–C8 범위를 벗어났습니다. ABC 음높이를 확인하세요.",
+    );
   const meter = visual.getMeterFraction();
   await buffer.init({
     audioContext: audio,

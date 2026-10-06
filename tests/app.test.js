@@ -327,3 +327,68 @@ test("ABC T title drives editor, saved library and reopened legacy scores", asyn
   assert.equal(await page.evaluate(() => readScores()[0].title), "수정한 제목");
   await page.close();
 });
+
+test("Clarinet timbre transposes written C to Bb and switches exclusively during playback", async () => {
+  const page = await browser.newPage();
+  const requests = [],
+    errors = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/soundfonts/")) requests.push(request.url());
+  });
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("http://127.0.0.1:3012");
+  await page.waitForSelector(".abcjs-note");
+  await page.locator("[data-tab=abc]").click();
+  const code =
+    "X:1\nT:Clarinet practice\nM:4/4\nL:1/4\nQ:1/4=60\nK:C\nC D E F |]";
+  await page.locator("#abc").fill(code);
+  await page.locator("#bpm").fill("60");
+  await page.locator("#bpm").dispatchEvent("change");
+  await page.locator("#save").click();
+  await page.locator("[data-tab=score]").click();
+  await page.locator("#instrument-clarinet").check();
+  assert.equal(await page.locator("#instrument-piano").isChecked(), false);
+  await page.locator(".abcjs-note").nth(1).locator("path").first().click();
+  await page.waitForFunction(() => playing && synth !== null);
+  const clarinet = await page.evaluate(() => ({
+    first: synth.flattened.tracks.flat().find((e) => e.cmd === "note"),
+    end: timings.at(-1).milliseconds,
+    position,
+    audible: synth.audioBuffers.some((b) =>
+      b.getChannelData(0).some((v) => Math.abs(v) > 0.001),
+    ),
+  }));
+  assert.equal(clarinet.first.pitch, 58);
+  assert.equal(clarinet.first.instrument, 71);
+  assert.equal(clarinet.end, 4000);
+  assert(clarinet.position >= 1000 && clarinet.position < 2000);
+  assert(clarinet.audible);
+  assert(requests.some((u) => u.endsWith("/clarinet-mp3/Bb3.mp3")));
+  assert.equal(await page.locator("#abc").inputValue(), code);
+  await page.locator("#instrument-piano").check();
+  await page.waitForFunction(
+    () =>
+      playing &&
+      synth !== null &&
+      synth.flattened.tracks.flat().find((e) => e.cmd === "note")
+        ?.instrument === 0,
+  );
+  const piano = await page.evaluate(() => ({
+    first: synth.flattened.tracks.flat().find((e) => e.cmd === "note"),
+    position,
+  }));
+  assert.equal(piano.first.pitch, 60);
+  assert.equal(await page.locator("#instrument-clarinet").isChecked(), false);
+  assert(piano.position >= clarinet.position);
+  assert(requests.some((u) => u.endsWith("/acoustic_grand_piano-mp3/C4.mp3")));
+  await page.locator("#reset").click();
+  await page.locator("#instrument-clarinet").check();
+  await page.locator("#instrument-clarinet").click();
+  assert.equal(await page.locator("#instrument-clarinet").isChecked(), true);
+  await page.reload();
+  await page.waitForSelector(".abcjs-note");
+  assert.equal(await page.locator("#instrument-clarinet").isChecked(), true);
+  assert.equal(await page.locator("#instrument-piano").isChecked(), false);
+  assert.deepEqual(errors, []);
+  await page.close();
+});

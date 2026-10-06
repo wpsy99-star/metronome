@@ -444,26 +444,88 @@
       textarea {
         outline-offset: 2px;
       }
-    
-      main { max-width:none; padding:24px 32px 110px; }
-      .workspace { display:flex; flex-direction:column; gap:16px; min-width:0; }
-      .workspace > .paper { width:100%; min-width:0; padding:22px 24px; }
-      .settings { display:flex; align-items:center; flex-wrap:wrap; gap:16px 24px; padding:14px 20px; }
-      .settings h3 { margin:0; white-space:nowrap; }
-      .tempo-controls { display:flex; align-items:center; gap:12px; flex:1 1 280px; max-width:440px; }
-      .tempo-controls .bpm { margin:0; gap:4px; }
-      .tempo-controls .bpm input { font-size:26px; width:70px; }
-      .tempo-controls input[type="range"] { flex:1; min-width:90px; width:auto; }
-      .practice-options { display:flex; align-items:center; flex-wrap:wrap; gap:12px 20px; font-size:13px; }
-      .practice-options label { white-space:nowrap; }
-      .practice-tip { font-size:12px; color:#7b8779; }
-      @media(max-width:680px) {
-        main { padding:20px 12px 120px; }
-        .settings { padding:12px 14px; gap:10px 14px; }
-        .tempo-controls { flex-basis:100%; max-width:none; }
-        .practice-tip { display:none; }
-        .workspace > .paper { padding:14px 10px; }
-        .heading { margin:18px 0; }
+
+      main {
+        max-width: none;
+        padding: 24px 32px 110px;
+      }
+      .workspace {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-width: 0;
+      }
+      .workspace > .paper {
+        width: 100%;
+        min-width: 0;
+        padding: 22px 24px;
+      }
+      .settings {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 16px 24px;
+        padding: 14px 20px;
+      }
+      .settings h3 {
+        margin: 0;
+        white-space: nowrap;
+      }
+      .tempo-controls {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex: 1 1 280px;
+        max-width: 440px;
+      }
+      .tempo-controls .bpm {
+        margin: 0;
+        gap: 4px;
+      }
+      .tempo-controls .bpm input {
+        font-size: 26px;
+        width: 70px;
+      }
+      .tempo-controls input[type="range"] {
+        flex: 1;
+        min-width: 90px;
+        width: auto;
+      }
+      .practice-options {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px 20px;
+        font-size: 13px;
+      }
+      .practice-options label {
+        white-space: nowrap;
+      }
+      .practice-tip {
+        font-size: 12px;
+        color: #7b8779;
+      }
+      @media (max-width: 680px) {
+        main {
+          padding: 20px 12px 120px;
+        }
+        .settings {
+          padding: 12px 14px;
+          gap: 10px 14px;
+        }
+        .tempo-controls {
+          flex-basis: 100%;
+          max-width: none;
+        }
+        .practice-tip {
+          display: none;
+        }
+        .workspace > .paper {
+          padding: 14px 10px;
+        }
+        .heading {
+          margin: 18px 0;
+        }
       }
     </style>
   </head>
@@ -567,14 +629,64 @@
               <h3>연습 설정</h3>
               <div class="tempo-controls">
                 <label for="bpm" class="muted">템포</label>
-                <div class="bpm"><input id="bpm" type="number" min="30" max="240" value="100" aria-label="BPM"><span class="muted">BPM</span></div>
-                <input id="range" type="range" min="30" max="240" value="100" aria-label="템포 조절">
+                <div class="bpm">
+                  <input
+                    id="bpm"
+                    type="number"
+                    min="30"
+                    max="240"
+                    value="100"
+                    aria-label="BPM"
+                  /><span class="muted">BPM</span>
+                </div>
+                <input
+                  id="range"
+                  type="range"
+                  min="30"
+                  max="240"
+                  value="100"
+                  aria-label="템포 조절"
+                />
               </div>
+              <fieldset
+                class="instrument-options"
+                style="
+                  border: 0;
+                  padding: 0;
+                  margin: 0;
+                  display: flex;
+                  align-items: center;
+                  gap: 12px;
+                  flex-wrap: wrap;
+                "
+              >
+                <legend class="muted" style="float: left; margin-right: 10px">
+                  연습 악기
+                </legend>
+                <label
+                  ><input id="instrument-piano" type="checkbox" checked />
+                  피아노</label
+                >
+                <label
+                  ><input id="instrument-clarinet" type="checkbox" /> B♭
+                  클라리넷</label
+                >
+                <span id="instrument-description" class="muted"
+                  >악보 그대로 재생</span
+                >
+              </fieldset>
               <div class="practice-options">
-                <label><input id="highlight" type="checkbox" checked> 음표 색상 표시</label>
-                <label><input id="metronome" type="checkbox"> 메트로놈 소리</label>
+                <label
+                  ><input id="highlight" type="checkbox" checked /> 음표 색상
+                  표시</label
+                >
+                <label
+                  ><input id="metronome" type="checkbox" /> 메트로놈 소리</label
+                >
               </div>
-              <span class="practice-tip">음표를 클릭해 원하는 위치부터 연습하세요.</span>
+              <span class="practice-tip"
+                >음표를 클릭해 원하는 위치부터 연습하세요.</span
+              >
             </section>
             <section class="paper">
               <div class="paper-head">
@@ -617,7 +729,6 @@ C C G G | A A G2 | F F E E | D D C2 |
 G G F F | E E D2 | G G F F | E E D2 |
 C C G G | A A G2 | F F E E | D D C2 |]</textarea>
             </section>
-
           </div>
         </section>
       </main>
@@ -629,7 +740,7 @@ C C G G | A A G2 | F F E E | D D C2 |]</textarea>
       <div class="progress">
         <span
           ><span id="player-title">작은 별</span>
-          <span class="muted">· 피아노 재생</span></span
+          <span class="muted" id="player-instrument">· 피아노 재생</span></span
         >
         <div class="track">
           <span id="progress-bar" style="width: 0%"></span>
@@ -652,7 +763,11 @@ C C G G | A A G2 | F F E E | D D C2 |]</textarea>
         />
       </div>
       <p class="hint">
-        <span id="storage-info">악보는 현재 브라우저에 저장되며 다른 기기와 자동 동기화되지 않습니다.</span> 필요한 악보는 ABC 파일로 내보내 보관하세요.
+        <span id="storage-info"
+          >악보는 현재 브라우저에 저장되며 다른 기기와 자동 동기화되지
+          않습니다.</span
+        >
+        필요한 악보는 ABC 파일로 내보내 보관하세요.
       </p>
       <p id="import-status" role="status" class="hint"></p>
       <div class="actions">
