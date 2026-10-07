@@ -404,7 +404,7 @@ async function prepare() {
     },
     sequence,
     millisecondsPerMeasure: 240000 / Number($("#bpm").value),
-    options: { soundFontUrl: "/soundfonts/", soundFontVolumeMultiplier: 2.1 },
+    options: { soundFontUrl: "/soundfonts/", soundFontVolumeMultiplier: 1.47 },
   });
   if (sampleError || loaded.error?.length)
     throw new Error(
@@ -437,8 +437,8 @@ function metronome(offset, total) {
     const oscillator = audio.createOscillator(),
       gain = audio.createGain();
     oscillator.frequency.value = 1000;
-    gain.gain.setValueAtTime(0.078, startClock + t);
-    gain.gain.exponentialRampToValueAtTime(0.0013, startClock + t + 0.04);
+    gain.gain.setValueAtTime(0.117, startClock + t);
+    gain.gain.exponentialRampToValueAtTime(0.00195, startClock + t + 0.04);
     oscillator.connect(gain).connect(audio.destination);
     oscillator.start(startClock + t);
     oscillator.stop(startClock + t + 0.045);
